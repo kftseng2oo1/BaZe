@@ -145,6 +145,30 @@ select{-webkit-appearance:none;appearance:none;padding-right:22px;background-ima
 #vCanvas{display:block;width:auto;height:min(52vh,560px);max-width:100%;margin:0 auto;border-radius:12px;border:1px solid var(--line);background:#f4eee2}
 #vPlayer{display:block;width:100%;max-height:50vh;border-radius:12px;margin-top:10px;background:#000}
 #vidMask .sheet{max-height:94vh}
+.lnbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 8px}
+.lnyr{text-align:center;font-family:var(--serif);font-size:22px}
+.lnyr b{font-size:26px}
+.lnscore{display:flex;align-items:center;gap:14px;margin:6px 0}
+.ring{width:96px;height:96px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center}
+.ring>div{width:76px;height:76px;border-radius:50%;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring b{font-size:26px;line-height:1.1;font-family:var(--serif)}
+.ring span{font-size:12.5px;color:var(--sub)}
+.aspect{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--bg)}
+.aspect .ah{display:flex;justify-content:space-between;align-items:center}
+.aspect .ah b{font-family:var(--serif);font-size:16px}
+.aspect .st{letter-spacing:2px;font-size:15px}
+.aspect ul{margin:6px 0 0;padding-left:18px;font-size:14px;line-height:1.65}
+.lm{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.lm .c{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:6px 4px;text-align:center;background:var(--bg);cursor:pointer}
+.lm .y{font-size:10.5px;color:var(--sub);white-space:nowrap;letter-spacing:-.2px} .lm .gz{font-family:var(--serif);font-size:18px;font-weight:700}
+.lm .tgs{font-size:11px;color:var(--sub)} .lm .sc{font-size:13px;font-weight:700}
+.trend{display:flex;align-items:flex-end;gap:4px;height:170px;margin:8px 0;padding-top:4px}
+.trend .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;border-radius:8px;padding:2px 0}
+.trend .tb.on{background:var(--soft)}
+.trend .tb i{display:block;width:70%;border-radius:5px 5px 2px 2px;min-height:6px}
+.trend .v{font-size:11px;color:var(--sub)} .trend .yy{font-size:11.5px;margin-top:3px}
+.trend .tb.now .yy{color:var(--accent);font-weight:700}
+.trend .gz{font-size:11px;font-family:var(--serif);color:var(--sub)}
 .dots:after{content:'…';animation:dd 1.2s infinite}
 @keyframes dd{0%{content:'．'}33%{content:'．．'}66%{content:'．．．'}}
 
@@ -216,6 +240,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin:20px 0 0}
       <button data-t="chart" class="on">命盤</button>
       <button data-t="persona">人格特性</button>
       <button data-t="wx">五行喜用</button>
+      <button data-t="ln">流年運勢</button>
       <button data-t="dy">大運流年</button>
       <button data-t="rel">神煞・刑沖合</button>
       <button data-t="ai">AI 大師</button>
@@ -223,6 +248,7 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin:20px 0 0}
     <section class="card tabp" id="p-chart"></section>
     <section class="card tabp hidden" id="p-persona"></section>
     <section class="card tabp hidden" id="p-wx"></section>
+    <section class="card tabp hidden" id="p-ln"></section>
     <section class="card tabp hidden" id="p-dy"></section>
     <section class="card tabp hidden" id="p-rel"></section>
     <section class="card tabp hidden" id="p-ai">
@@ -699,6 +725,177 @@ function personaText(C){
     + (ps.ss.length ? '；性格神煞' + ps.ss.join('、') : '');
 }
 
+/* ============ 流年運勢分析 ============ */
+var WX_ORGAN = ['肝膽、筋骨、眼睛','心臟、血液循環、睡眠','脾胃、消化、肌肉','肺、呼吸道、皮膚','腎、泌尿、內分泌'];
+var MONTH_JIE = ['立春','惊蛰','清明','立夏','芒种','小暑','立秋','白露','寒露','立冬','大雪','XIAO_HAN','LI_CHUN'];
+function wxJudge(C, w){ var st = C.st; return st.yong.indexOf(w) >= 0 ? 2 : st.xi.indexOf(w) >= 0 ? 1 : st.ji.indexOf(w) >= 0 ? -1.2 : 0; }
+function scoreLabel(sc){ return sc >= 80 ? '大吉' : sc >= 68 ? '吉' : sc >= 55 ? '平' : sc >= 42 ? '小凶' : '凶'; }
+function scoreColor(sc){ return sc >= 68 ? 'var(--good)' : sc >= 55 ? 'var(--earth)' : 'var(--bad)'; }
+/* 計算某組干支（流年或流月）對命局的作用與分數 */
+function gzImpact(C, g, z, extra){
+  var dm = C.dm, P = C.P, n = C.hasTime ? 4 : 3, base = 0, flags = [], i;
+  base += wxJudge(C, GAN_WX[g]) * 1.0;
+  var hz = HIDE[z], hw = HIDE_W[hz.length];
+  for (i=0; i<hz.length; i++) base += wxJudge(C, GAN_WX[hz[i]]) * 1.5 * hw[i];
+  var dz = P[2].z, mz = P[1].z, dg = P[2].g;
+  if (Math.abs(z - dz) === 6){ base -= 1.5; flags.push('沖日支'); }
+  if (Math.abs(z - mz) === 6){ base -= 1; flags.push('沖月支'); }
+  if (Math.abs(z - P[0].z) === 6){ base -= 0.5; flags.push('沖年支'); }
+  if (C.hasTime && Math.abs(z - P[3].z) === 6){ base -= 0.5; flags.push('沖時支'); }
+  if ((z + dz) % 12 === 1){ base += 0.5; flags.push('合日支'); }
+  if (Math.abs(g - dg) === 5) flags.push('合日主');
+  for (i=0; i<n; i++){ var x = xing(z, P[i].z); if (x && (z !== P[i].z || x === '自刑')){ base -= 0.6; flags.push('刑' + PSHORT[i] + '支'); break; } }
+  if ((z + dz) % 12 === 7){ base -= 0.4; flags.push('害日支'); }
+  var gk = rel(GAN_WX[g], GAN_WX[dg]);
+  if (Math.abs(z - dz) === 6 && (gk === 2 || Math.abs(g - dg) === 6)){ base -= 1.5; flags.push('天剋地沖日柱'); }
+  if (g === dg && z === dz){ base -= 1; flags.push('伏吟日柱'); }
+  if (extra && extra.dy){
+    if (extra.dy.g === g && extra.dy.z === z){ base -= 1; flags.push('歲運並臨'); }
+    else if (Math.abs(z - extra.dy.z) === 6){ base -= 0.7; flags.push('沖大運'); }
+  }
+  if (extra && extra.yz != null && Math.abs(z - extra.yz) === 6){ base -= 0.6; flags.push('沖流年'); }
+  var sc = Math.round(Math.max(18, Math.min(96, 60 + base * 5.5)));
+  return {score:sc, base:base, flags:flags, gGod:tenGod(dm, g), zGod:zhiGod(dm, z)};
+}
+function yearShensha(C, z){
+  var dm = C.dm, yz = C.P[0].z, dzz = C.P[2].z, out = [];
+  var ty = TIANYI[dm]; if (ty.indexOf(z) >= 0) out.push('天乙貴人');
+  if (WENCHANG[dm] === z) out.push('文昌');
+  if (LU[dm] === z) out.push('祿神');
+  if (YANGREN[dm] === z) out.push('羊刃');
+  var a = sanheIdx(yz), b = sanheIdx(dzz);
+  if (TAOHUA[a] === z || TAOHUA[b] === z) out.push('桃花');
+  if (YIMA[a] === z || YIMA[b] === z) out.push('驛馬');
+  if (HUAGAI[a] === z || HUAGAI[b] === z) out.push('華蓋');
+  var hl = (3 - yz + 12) % 12; if (z === hl) out.push('紅鸞'); if (z === (hl + 6) % 12) out.push('天喜');
+  if (C.kong.indexOf(z) >= 0) out.push('空亡');
+  return out;
+}
+function stars(v){ v = Math.max(1, Math.min(5, Math.round(v))); var s = ''; for (var i=0; i<5; i++) s += i < v ? '★' : '☆'; return s; }
+function yearReport(C, year){
+  var a = analyzeYear(C, year), dm = C.dm, male = !!C.inp.gender;
+  var dy = a.dy, imp = gzImpact(C, a.g, a.z, {dy:dy});
+  var sha = yearShensha(C, a.z);
+  var gGrp = GOD_GROUP[a.gGod], zGrp = GOD_GROUP[a.zGod];
+  var grps = [gGrp, zGrp];
+  function hasG(x){ return grps.indexOf(x) >= 0; }
+  function fav(grp){ var w = (GAN_WX[dm] + GROUP_BY_REL.indexOf(grp)) % 5; return wxJudge(C, w); }
+  var flags = imp.flags, D = {}, adj = (imp.score - 60) / 20;
+  /* 事業 */
+  var car = [], cs = 3 + adj;
+  if (hasG('官殺')){ if (fav('官殺') > 0){ car.push('官殺為喜，有升遷、受重用或承擔要職的機會'); cs += 1.2; } else { car.push('官殺為忌，責任與壓力加重，須防小人、是非與考核'); cs -= 1; } }
+  if (hasG('食傷')){ car.push(fav('食傷') > 0 ? '食傷發揮，創意與表現受肯定，適合推動新企劃' : '食傷洩氣，想法多但易言多必失，宜謹言慎行'); cs += fav('食傷') > 0 ? 0.8 : -0.5; }
+  if (hasG('印星')){ car.push(fav('印星') > 0 ? '印星照身，利進修、考證照，有長輩貴人提攜' : '印星過重，容易想多做少、依賴他人'); cs += fav('印星') > 0 ? 0.8 : -0.4; }
+  if (hasG('比劫')){ car.push(fav('比劫') > 0 ? '比劫助身，同儕合作有力，適合團隊作戰' : '比劫爭奪，職場競爭激烈，合夥宜慎'); cs += fav('比劫') > 0 ? 0.5 : -0.6; }
+  if (hasG('財星')) car.push('財星透出，工作重心偏向業績、業務與實際成果');
+  if (a.gGod === '傷官' && C.P.slice(0, C.hasTime?4:3).some(function(p, i){ return i !== 2 && p.god === '正官'; })){ car.push('流年傷官見原局正官，易與上司或制度衝突，宜忍讓'); cs -= 0.8; }
+  if (flags.indexOf('沖月支') >= 0){ car.push('流年沖月柱，工作環境、部門或職位易有變動'); cs -= 0.3; }
+  if (sha.indexOf('驛馬') >= 0) car.push('驛馬星動，出差、外派、轉換地點的機會多');
+  D.career = {name:'事業', v:cs, items:car};
+  /* 財運 */
+  var fin = [], fs = 3 + adj;
+  if (hasG('財星')){ if (fav('財星') > 0){ fin.push('財星為喜，正財收入穩定增加，偏財亦有機會'); fs += 1.3; } else { fin.push('財星為忌，因財生壓力，開銷大、投資宜保守'); fs -= 0.8; } }
+  if (hasG('比劫')){ fin.push(fav('比劫') > 0 ? '比劫幫身，能與人合作求財' : '比劫奪財，慎防破財、借貸、作保與合夥糾紛'); fs += fav('比劫') > 0 ? 0.3 : -1.2; }
+  if (hasG('食傷') && fav('食傷') > 0){ fin.push('食傷生財，靠技術、才藝與口碑帶來收入'); fs += 0.6; }
+  if (sha.indexOf('祿神') >= 0){ fin.push('流年逢祿，衣食與工作收入有保障'); fs += 0.6; }
+  if (!fin.length) fin.push(adj < -0.3 ? '整體運勢偏弱，財運隨之起伏，以守成、儲蓄為宜，不宜擴張或高風險投資' : '財運平穩，以守成、儲蓄、規律理財為宜');
+  D.wealth = {name:'財運', v:fs, items:fin};
+  /* 感情 */
+  var lov = [], ls = 3 + adj, spouseGrp = male ? '財星' : '官殺', spouseTxt = male ? '財星（妻星）' : '官殺（夫星）';
+  if (hasG(spouseGrp)){ lov.push('流年見' + spouseTxt + '，' + (fav(spouseGrp) > 0 ? '異性緣佳，單身易遇對象，有伴者感情升溫' : '感情課題浮現，宜多溝通、避免猜疑')); ls += fav(spouseGrp) > 0 ? 1.2 : -0.3; }
+  if (flags.indexOf('合日支') >= 0){ lov.push('流年合入夫妻宮，有結婚、同居或關係更進一步的契機'); ls += 1; }
+  if (flags.indexOf('沖日支') >= 0){ lov.push('流年沖夫妻宮，感情或居家易有變動，宜包容、少爭執'); ls -= 1.2; }
+  if (sha.indexOf('紅鸞') >= 0 || sha.indexOf('天喜') >= 0){ lov.push('紅鸞天喜星動，主婚戀喜事、添丁之喜'); ls += 1; }
+  if (sha.indexOf('桃花') >= 0){ lov.push('流年逢桃花，社交活躍、人緣佳；有伴者宜守分寸'); ls += 0.4; }
+  if (!male && hasG('食傷') && !hasG('官殺')){ lov.push('食傷剋官，對伴侶要求較高，容易挑剔'); ls -= 0.4; }
+  if (male && hasG('比劫') && !hasG('財星')){ lov.push('比劫爭財，感情中可能出現競爭者或因朋友起波折'); ls -= 0.4; }
+  if (!lov.length) lov.push(adj < -0.3 ? '心情易受大環境影響，感情宜多體諒、少計較' : '感情平穩，適合經營既有關係');
+  D.love = {name:'感情', v:ls, items:lov};
+  /* 健康 */
+  var hea = [], hs = 3.5 + adj, jw = [];
+  [GAN_WX[a.g], ZHI_WX[a.z]].forEach(function(w){ if (C.st.ji.indexOf(w) >= 0 && jw.indexOf(w) < 0) jw.push(w); });
+  jw.forEach(function(w){ hea.push('流年' + WX[w] + '為忌，宜多保養' + WX_ORGAN[w]); hs -= 0.7; });
+  var sw = C.st.score, minW = 0; for (var i=1; i<5; i++) if (sw[i] < sw[minW]) minW = i;
+  if ((GAN_WX[a.g] + 2) % 5 === minW || (ZHI_WX[a.z] + 2) % 5 === minW){ hea.push('原局' + WX[minW] + '最弱又逢流年剋制，' + WX_ORGAN[minW] + '要特別照顧'); hs -= 0.6; }
+  if (sha.indexOf('羊刃') >= 0){ hea.push('流年逢羊刃，行事勿急躁，運動、開車、用刀具多留意'); hs -= 0.6; }
+  if (flags.indexOf('天剋地沖日柱') >= 0 || flags.indexOf('沖日支') >= 0){ hea.push('日柱受沖，作息與情緒起伏較大，定期健檢、規律生活'); hs -= 0.5; }
+  if (!hea.length) hea.push('體況平穩，維持規律作息與運動即可');
+  D.health = {name:'健康', v:hs, items:hea};
+  /* 人際學業 */
+  var soc = [], ss = 3 + adj;
+  if (sha.indexOf('天乙貴人') >= 0){ soc.push('天乙貴人臨年，遇事有人相助，宜多向前輩請益'); ss += 1.2; }
+  if (sha.indexOf('文昌') >= 0){ soc.push('文昌星照，利考試、寫作、學習新技能'); ss += 1; }
+  if (sha.indexOf('華蓋') >= 0){ soc.push('華蓋臨年，喜靜思、宗教、藝術，適合沉澱與進修'); ss += 0.3; }
+  if (hasG('印星') && fav('印星') > 0){ soc.push('印星為喜，學習吸收力強，長輩緣佳'); ss += 0.6; }
+  if (hasG('比劫') && fav('比劫') <= 0){ soc.push('比劫為忌，朋友間易有比較與利益衝突'); ss -= 0.6; }
+  if (a.tai.length){ soc.push('本年' + a.tai.join('、') + '，人事變動較多，凡事低調穩健'); ss -= 0.5; }
+  if (!soc.length) soc.push('人際平順，維持良好互動即可');
+  D.social = {name:'人際・學業', v:ss, items:soc};
+  /* 流月 */
+  var tb = Solar.fromYmd(year, 6, 1).getLunar().getJieQiTable(), months = [];
+  var mg0 = ((a.g % 5) * 2 + 2) % 10;
+  for (var m=0; m<12; m++){
+    var g = (mg0 + m) % 10, z = (2 + m) % 12, s0 = tb[MONTH_JIE[m]], s1 = tb[MONTH_JIE[m+1]];
+    var mi = gzImpact(C, g, z, {dy:dy, yz:a.z});
+    var ms = Math.round(Math.max(18, Math.min(96, mi.score * 0.6 + imp.score * 0.4)));
+    months.push({g:g, z:z, gz:GAN[g] + ZHI[z], from:s0 ? s0.toYmd().slice(5).replace('-', '/') : '', to:s1 ? s1.toYmd().slice(5).replace('-', '/') : '',
+                 fromFull:s0 ? s0.toYmd() : '', score:ms, gGod:mi.gGod, zGod:mi.zGod, flags:mi.flags, label:ZHI[z] + '月'});
+  }
+  var sorted = months.slice().sort(function(p, q){ return q.score - p.score; });
+  return {a:a, imp:imp, sha:sha, D:D, months:months, best:sorted.slice(0, 2), worst:sorted.slice(-2).reverse(), score:imp.score, label:scoreLabel(imp.score)};
+}
+function yearSummary(R){
+  var a = R.a, s = R.score;
+  var lead = s >= 80 ? '運勢強旺，宜積極把握機會、主動出擊。' : s >= 68 ? '整體順遂，穩中有進，適合推動計畫。' : s >= 55 ? '吉凶參半，守中帶攻，凡事預留餘裕。' : s >= 42 ? '阻力較多，宜保守穩健，先求不敗。' : '壓力較大，以守為攻、保身為先，重大決定多方評估。';
+  return a.year + ' ' + a.gz + '年，流年天干' + a.gGod + '、地支' + a.zGod + (a.dy ? '，行' + a.dy.gz + '大運' : '') + '。' + lead;
+}
+function reportText(R){
+  var L = [yearSummary(R) + '（系統評分 ' + R.score + '・' + R.label + '）'];
+  if (R.imp.flags.length) L.push('作用：' + R.imp.flags.join('、'));
+  if (R.sha.length) L.push('流年神煞：' + R.sha.join('、'));
+  ['career','wealth','love','health','social'].forEach(function(k){ var d = R.D[k]; L.push(d.name + stars(d.v) + '：' + d.items.join('；')); });
+  L.push('流月評分：' + R.months.map(function(m){ return m.label + m.gz + '(' + m.from + ')' + m.score; }).join('、'));
+  return L.join('\n');
+}
+var lnYear = 0;
+function renderLN(C){
+  if (!lnYear) lnYear = currentBaziYear();
+  var R = yearReport(C, lnYear), a = R.a, cy = currentBaziYear(), h = '';
+  h += '<div class="lnbar"><button class="btn small" data-ly="' + (lnYear-1) + '">‹ ' + (lnYear-1) + '</button><div class="lnyr"><b>' + lnYear + '</b> ' + wxSpan(a.gz.charAt(0), true) + wxSpan(a.gz.charAt(1), false) + '年<div class="hint">虛歲 ' + a.age + (lnYear === cy ? '・今年' : '') + '</div></div><button class="btn small" data-ly="' + (lnYear+1) + '">' + (lnYear+1) + ' ›</button></div>';
+  if (lnYear !== cy) h += '<div style="text-align:center;margin-top:-4px"><button class="btn small ghost" data-ly="' + cy + '">回到今年</button></div>';
+  var deg = Math.round(R.score * 3.6);
+  h += '<div class="lnscore"><div class="ring" style="background:conic-gradient(' + scoreColor(R.score) + ' ' + deg + 'deg,var(--soft) 0)"><div><b>' + R.score + '</b><span>' + R.label + '</span></div></div><p class="note">' + esc(yearSummary(R)) + '</p></div>';
+  h += '<div class="chips">';
+  h += '<span class="chip">天干 ' + a.gGod + '・' + a.gJudge + '</span><span class="chip">地支 ' + a.zGod + '・' + a.zJudge + '</span>';
+  if (a.dy) h += '<span class="chip">大運 ' + a.dy.gz + '</span>';
+  a.tai.forEach(function(t){ h += '<span class="chip" style="color:var(--bad)">' + t + '</span>'; });
+  R.imp.flags.forEach(function(f){ h += '<span class="chip" style="color:' + (/合/.test(f) ? 'var(--good)' : 'var(--bad)') + '">' + f + '</span>'; });
+  R.sha.forEach(function(s){ h += '<span class="chip" style="color:' + (SHENSHA_BAD[s] || s === '羊刃' ? 'var(--bad)' : 'var(--good)') + '">' + s + '</span>'; });
+  h += '</div>';
+  h += '<h3>五大面向</h3>';
+  ['career','wealth','love','health','social'].forEach(function(k){
+    var d = R.D[k];
+    h += '<div class="aspect"><div class="ah"><b>' + d.name + '</b><span class="st" style="color:' + (d.v >= 3.5 ? 'var(--good)' : d.v >= 2.5 ? 'var(--earth)' : 'var(--bad)') + '">' + stars(d.v) + '</span></div><ul>' + d.items.map(function(t){ return '<li>' + t + '</li>'; }).join('') + '</ul></div>';
+  });
+  h += '<h3>流月運勢</h3><div class="hint">以節氣分月；分數綜合流月與流年。點月份可問 AI 大師。</div><div class="lm">';
+  R.months.forEach(function(m, i){
+    h += '<div class="c" data-m="' + i + '" style="border-left-color:' + scoreColor(m.score) + '"><div class="y">' + m.label + '・' + m.from + '</div><div class="gz">' + wxSpan(m.gz.charAt(0), true) + wxSpan(m.gz.charAt(1), false) + '</div><div class="tgs">' + m.gGod + '</div><div class="sc" style="color:' + scoreColor(m.score) + '">' + m.score + '</div></div>';
+  });
+  h += '</div><ul class="list"><li><b>把握月份</b>　' + R.best.map(function(m){ return m.label + '（' + m.from + '起）'; }).join('、') + '</li><li><b>留意月份</b>　' + R.worst.map(function(m){ return m.label + '（' + m.from + '起）' + (m.flags.length ? '・' + m.flags[0] : ''); }).join('、') + '</li></ul>';
+  /* 十年趨勢 */
+  var ys = []; for (var y=lnYear-4; y<=lnYear+5; y++) ys.push(y);
+  h += '<h3>十年趨勢</h3><div class="trend">';
+  ys.forEach(function(y){
+    var r = gzImpact(C, gi(yearGZ(y).charAt(0)), zi(yearGZ(y).charAt(1)), {dy:(function(){ var di = currentDY(C, y); return di >= 0 ? C.DY[di] : null; })()});
+    h += '<div class="tb' + (y === lnYear ? ' on' : '') + (y === cy ? ' now' : '') + '" data-ly="' + y + '"><span class="v">' + r.score + '</span><i style="height:' + Math.max(8, r.score - 15) + '%;background:' + scoreColor(r.score) + '"></i><span class="yy">' + String(y).slice(2) + '</span><span class="gz">' + yearGZ(y) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="row"><button class="btn primary" id="askLN">請 AI 大師詳論 ' + lnYear + ' 年</button></div>';
+  h += '<p class="hint">評分依喜用神、刑沖合害、太歲與流年神煞推算，作為趨勢參考。</p>';
+  $('p-ln').innerHTML = h;
+  $('p-ln').__R = R;
+}
+
 /* ============ 人格動畫旁白影片 ============ */
 var VW = 720, VH = 1280;
 var V_SERIF = '"Songti TC","Noto Serif TC","Noto Serif CJK TC","PMingLiU",serif';
@@ -1145,7 +1342,7 @@ function render(C){
   $('result').className = '';
   renderSummary(C); renderChart(C); renderPersona(C); renderWX(C);
   var cy = currentBaziYear(); selYear = cy; selDY = currentDY(C, cy); if (selDY < 0) selDY = 0;
-  renderDY(C); renderRel(C); renderQChips();
+  renderDY(C); lnYear = cy; renderLN(C); renderRel(C); renderQChips();
 }
 function renderSummary(C){
   var nm = C.inp.name || '命主';
@@ -1263,7 +1460,7 @@ function renderYear(C){
   if (a.tai.length) h += '<p class="note" style="color:var(--bad)">太歲：' + a.tai.join('、') + '</p>';
   if (a.rels.length) h += '<ul class="list">' + a.rels.map(relLi).join('') + '</ul>';
   else h += '<p class="hint">流年與原局、大運無明顯刑沖合。</p>';
-  h += '<div class="row"><button class="btn small" id="askYear">請 AI 大師詳論 ' + a.year + ' 年</button></div>';
+  h += '<div class="row"><button class="btn small" id="goLN">完整流年分析 ›</button><button class="btn small" id="askYear">請 AI 大師詳論 ' + a.year + ' 年</button></div>';
   $('yearBox').innerHTML = h;
 }
 function renderRel(C){
@@ -1393,6 +1590,7 @@ function bind(){
   $('btnSave').addEventListener('click', saveCurrent);
   $('tabs').addEventListener('click', function(e){ var t = e.target.getAttribute('data-t'); if (t) setTab(t); });
   $('p-dy').addEventListener('click', function(e){
+    if (e.target.id === 'goLN'){ lnYear = selYear; renderLN(CUR); setTab('ln'); $('tabs').scrollIntoView({block:'start'}); return; }
     var el = e.target; while (el && el !== this && !el.getAttribute('data-i') && !el.getAttribute('data-y') && el.id !== 'askYear') el = el.parentNode;
     if (!el || el === this) return;
     if (el.id === 'askYear'){ setTab('ai'); ask('請詳論 ' + selYear + ' 年（' + yearGZ(selYear) + '）流年運勢，並指出需要注意的月份。'); return; }
@@ -1407,6 +1605,14 @@ function bind(){
   $('vDown').addEventListener('click', downloadVideo);
   $('vStatus').addEventListener('click', function(e){ if (e.target.id === 'vSilent') runVideo(true, true); });
   $('p-persona').addEventListener('click', function(e){ if (e.target.id === 'openVideo'){ openVideo(); return; } if (e.target.id === 'askPersona'){ setTab('ai'); ask('請深入分析我的人格特質：天性、內在動機、優勢與盲點、人際與親密關係中的模式，以及如何揚長補短。'); } });
+  $('p-ln').addEventListener('click', function(e){
+    var el = e.target, R = this.__R;
+    while (el && el !== this && el.getAttribute('data-ly') === null && el.getAttribute('data-m') === null && el.id !== 'askLN') el = el.parentNode;
+    if (!el || el === this) return;
+    if (el.id === 'askLN'){ setTab('ai'); ask('請依下列系統流年分析，詳論我 ' + lnYear + ' 年的流年運勢（事業、財運、感情、健康、人際），並點出關鍵月份與趨吉避凶的建議：\n' + reportText(R)); return; }
+    if (el.getAttribute('data-m') !== null){ var m = R.months[+el.getAttribute('data-m')]; setTab('ai'); ask('請詳論我 ' + lnYear + ' 年' + m.label + '（' + m.gz + '月，' + m.fromFull + ' 起）的流月運勢，該月系統評分 ' + m.score + (m.flags.length ? '，作用：' + m.flags.join('、') : '') + '。'); return; }
+    lnYear = +el.getAttribute('data-ly'); renderLN(CUR);
+  });
   $('qchips').addEventListener('click', function(e){ var q = e.target.getAttribute('data-q'); if (q) ask('請論我的' + q + '。'); });
   $('askBtn').addEventListener('click', function(){ var v = $('askIn').value.trim(); if (v){ $('askIn').value = ''; ask(v); } });
   $('askIn').addEventListener('keydown', function(e){ if (e.keyCode === 13){ e.preventDefault(); $('askBtn').click(); } });
