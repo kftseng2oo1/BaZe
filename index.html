@@ -138,6 +138,10 @@ select{-webkit-appearance:none;appearance:none;padding-right:22px;background-ima
 .msg.err{color:var(--bad);background:var(--bg);border:1px dashed var(--bad)}
 .ask{display:flex;gap:8px}
 .ask input{flex:1}
+.persona-hero{display:flex;align-items:center;gap:14px;margin:4px 0 10px;padding:12px;border-radius:12px;background:var(--soft)}
+.ph-img{width:60px;height:60px;border-radius:50%;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none}
+.ph-t{font-family:var(--serif);font-size:18px;font-weight:700}
+.ph-k{font-size:14px;color:var(--sub);margin-top:2px}
 .dots:after{content:'…';animation:dd 1.2s infinite}
 @keyframes dd{0%{content:'．'}33%{content:'．．'}66%{content:'．．．'}}
 
@@ -207,12 +211,14 @@ footer{font-size:12px;color:var(--sub);text-align:center;margin:20px 0 0}
     <section class="card" id="summary"></section>
     <nav class="tabs" id="tabs">
       <button data-t="chart" class="on">命盤</button>
+      <button data-t="persona">人格特性</button>
       <button data-t="wx">五行喜用</button>
       <button data-t="dy">大運流年</button>
       <button data-t="rel">神煞・刑沖合</button>
       <button data-t="ai">AI 大師</button>
     </nav>
     <section class="card tabp" id="p-chart"></section>
+    <section class="card tabp hidden" id="p-persona"></section>
     <section class="card tabp hidden" id="p-wx"></section>
     <section class="card tabp hidden" id="p-dy"></section>
     <section class="card tabp hidden" id="p-rel"></section>
@@ -540,6 +546,143 @@ function analyzeYear(C, year){
           gJudge:judge(gw), zJudge:judge(zw), age:year - C.inp.y + 1};
 }
 
+/* ============ 人格特性 ============ */
+var DM_PERSONA = [
+  {img:'參天大樹', key:'正直・上進・有擔當', good:'有原則、目標明確、願意承擔責任，給人可靠的長兄長姊感', weak:'固執、不易轉彎、好面子，受挫時容易硬撐'},
+  {img:'花草藤蘿', key:'柔韌・細膩・善借力', good:'適應力強、懂得察言觀色，能在環境中找到生存縫隙並借勢而起', weak:'容易依賴他人、優柔寡斷，心思多而內耗'},
+  {img:'太陽', key:'熱情・開朗・大方', good:'光明磊落、有感染力，樂於照顧他人，天生是場面的焦點', weak:'性急、愛面子、三分鐘熱度，情緒來得快去得快'},
+  {img:'燭火星光', key:'細心・溫暖・有洞察', good:'外柔內明，觀察入微，擅長在細節處照亮他人，重感情', weak:'多疑敏感、情緒起伏，容易鑽牛角尖'},
+  {img:'高山厚土', key:'穩重・守信・包容', good:'沉得住氣、值得託付，遇事不慌，是團隊的定錨', weak:'保守、反應較慢，堅持起來難以說服'},
+  {img:'田園沃土', key:'謙和・務實・多才', good:'包容度高、樂於付出，能把資源滋養成果，擅長整合', weak:'猶豫多慮、容易委屈自己，界線不夠清楚'},
+  {img:'刀劍頑鐵', key:'剛毅・果斷・講義氣', good:'執行力強、敢作敢當，重義氣，遇不平願出頭', weak:'衝動好勝、直言易傷人，需經磨練方成大器'},
+  {img:'珠玉首飾', key:'精緻・敏銳・自尊強', good:'品味好、要求高、做事講究質感，重名譽與形象', weak:'挑剔、敏感、愛面子，受批評時內心反應大'},
+  {img:'江河大海', key:'聰明・靈活・有遠見', good:'反應快、格局大、善交際，能容納不同意見，點子多', weak:'善變隨性、不喜受約束，有時流於不夠專一'},
+  {img:'雨露甘霖', key:'溫柔・聰慧・富想像', good:'體貼入微、直覺敏銳、想像力豐富，潤物細無聲', weak:'多慮消極、易受環境影響，自信心需培養'}
+];
+var GOD_TRAIT = {
+  '比肩':['獨立自主、意志堅定、重平等','固執、不合群、不愛求助'],
+  '劫財':['積極好勝、行動力強、豪爽重朋友','衝動、易破財、愛爭強'],
+  '食神':['溫和樂觀、重生活品味、有才藝','懶散、過於理想化、逃避壓力'],
+  '傷官':['聰明有創意、口才好、勇於表現','叛逆、恃才傲物、批判性強'],
+  '偏財':['慷慨大方、交際手腕好、敢冒險','花錢不節制、多情、不夠專注'],
+  '正財':['務實勤儉、重承諾、腳踏實地','保守、斤斤計較、怕變動'],
+  '七殺':['果敢有魄力、抗壓力強、具威嚴','專斷急躁、壓力大、與人對立'],
+  '正官':['守規矩、責任感強、重名譽','拘謹放不開、在意他人眼光'],
+  '偏印':['思考獨特、直覺敏銳、愛鑽研冷門','孤僻多疑、虎頭蛇尾'],
+  '正印':['仁厚包容、好學、重精神修養','依賴被動、行動力不足']
+};
+var GROUP_LACK = ['自信與主見較弱，容易妥協，同儕助力較少','不擅表達情感與想法，表現慾低','對金錢較淡然，理財與現實規劃需加強','隨性自由、不喜約束，自律需刻意培養','習慣靠自己摸索，學習的耐心與持續力較弱'];
+var GROUP_ROLE = ['創業、業務、自由業、團隊衝鋒','創作、設計、表演、教學、企劃','商業經營、財務、管理、業務開發','管理、公職、法務、專案統籌、軍警','研究、教育、顧問、醫療、身心靈'];
+var GROUP_SOCIAL = ['重義氣、講平等，不喜歡被管','幽默健談、主動表達，喜歡分享','交遊廣闊、務實互惠，重實際往來','有分寸、守禮重諾，給人可靠感','溫和包容、樂於傾聽，像智囊'];
+var DIM_NAME = ['自主','表達','務實','紀律','思考'];
+var WX_VIRTUE = ['仁','禮','信','義','智'];
+var WX_EXCESS = ['執著己見，仁心過度反成固執','性急好表現，情緒易上火','保守固執，變通較慢','剛硬好鬥，說話不留餘地','心思多變，容易漂泊不定'];
+var WX_LACK = ['包容與成長動能不足','熱情與表達較少，顯得冷淡','穩定性不足，容易變卦','決斷力弱，容易心軟','變通與謀略較少，想法較直'];
+var SS_TRAIT = {'華蓋':'孤高聰慧，喜玄學、宗教、藝術，需要獨處空間','魁罡':'性格剛烈、聰明果斷，不服輸','羊刃':'性急有魄力，遇事敢衝，宜修忍耐','桃花':'人緣佳、重外表與美感，異性緣好','驛馬':'好動，不喜一成不變，適合常移動的生活','文昌':'好學有文采，思路清晰','將星':'天生有領導氣質，容易被推為主事者','天乙貴人':'待人有禮，處事常得貴人緣'};
+function godWeights(P, hasTime){
+  var w = {}, n = hasTime ? 4 : 3, dm = P[2].g, i, k;
+  for (k in GOD_TRAIT) if (GOD_TRAIT.hasOwnProperty(k)) w[k] = 0;
+  for (i=0; i<n; i++){
+    if (i !== 2) w[tenGod(dm, P[i].g)] += 1;
+    var h = HIDE[P[i].z], hw = HIDE_W[h.length], mult = (i === 1) ? 2 : 1;
+    for (k=0; k<h.length; k++) w[tenGod(dm, h[k])] += hw[k] * mult;
+  }
+  return w;
+}
+function calcPersona(C){
+  var P = C.P, st = C.st, dm = C.dm, n = C.hasTime ? 4 : 3, i;
+  var w = godWeights(P, C.hasTime), gods = [];
+  for (var k in w) if (w.hasOwnProperty(k)) gods.push({k:k, v:w[k]});
+  gods.sort(function(a,b){ return b.v - a.v; });
+  var top = gods.slice(0, 2).filter(function(g){ return g.v > 0.5; });
+  var share = st.grp.map(function(v){ return v / st.total; });
+  var dims = share.map(function(s){ return Math.max(0.06, Math.min(1, s / 0.4)); });
+  var lacks = []; for (i=0; i<5; i++) if (share[i] < 0.06) lacks.push(i);
+  var wxEx = [], wxLk = [];
+  for (i=0; i<5; i++){ var s = st.score[i] / st.total; if (s >= 0.35) wxEx.push(i); else if (s < 0.05) wxLk.push(i); }
+  var stems = []; for (i=0; i<n; i++) if (i !== 2) stems.push(tenGod(dm, P[i].g));
+  function has(g){ return stems.indexOf(g) >= 0; }
+  var combo = [];
+  if (has('傷官') && has('正官')) combo.push(['傷官見官','才氣與規範相衝，容易和上司、制度起摩擦，學會圓融表達就能化衝突為改革力。']);
+  if (has('食神') && has('七殺')) combo.push(['食神制殺','能把壓力轉成才幹，臨危不亂、有謀略，適合解決棘手問題。']);
+  if (has('七殺') && (has('正印') || has('偏印'))) combo.push(['殺印相生','有魄力也有城府，剛柔並濟，具領導與決策能力。']);
+  if (has('正官') && has('正印')) combo.push(['官印相生','端正穩重、易得信任，適合體制內發展與擔任要職。']);
+  if (has('傷官') && (has('正印') || has('偏印'))) combo.push(['傷官配印','才華有節制，創意兼具深度，利學術、專業與創作。']);
+  if ((has('食神') || has('傷官')) && (has('正財') || has('偏財'))) combo.push(['食傷生財','能把才華與點子變現，有商業頭腦。']);
+  if (has('偏印') && has('食神') && w['偏印'] > w['食神']) combo.push(['梟神奪食','想法多但容易半途轉向，專注一件事做到底是關鍵。']);
+  if (has('正官') && has('七殺')) combo.push(['官殺混雜','行事標準容易搖擺，壓力來源多，宜先釐清自己真正要什麼。']);
+  if (share[0] > 0.3 && share[2] > 0.08 && share[0] > share[2] * 2.5) combo.push(['比劫奪財','重朋友講義氣，但錢財容易因人而散，合夥、借貸要謹慎。']);
+  if (!st.strong && share[2] >= Math.max(share[1], share[3]) && share[2] > 0.2) combo.push(['財多身弱','想做的事多、責任重，容易心有餘而力不足，宜量力而為。']);
+  var ss = [];
+  for (i=0; i<n; i++) P[i].shensha.forEach(function(s){ if (SS_TRAIT[s] && ss.indexOf(s) < 0) ss.push(s); });
+  var order = [0,1,2,3,4].sort(function(a,b){ return share[b] - share[a]; });
+  var energy = st.ratio >= 0.58 ? '主見強、自信、行動果決，遇事習慣自己扛；要留意聽取不同意見。'
+             : st.ratio >= 0.42 ? '個性收放有度，能主動也能配合，適應不同環境。'
+             : st.ratio >= 0.2 ? '隨和、願意配合，重視身邊人的支持；累積自信與體力是成長關鍵。'
+             : '極善順勢而為，懂得依附強勢環境發揮，但要守住自己的核心。';
+  return {dm:DM_PERSONA[dm], top:top, gods:gods, share:share, dims:dims, lacks:lacks, wxEx:wxEx, wxLk:wxLk, combo:combo, ss:ss, energy:energy, order:order};
+}
+function radarSVG(dims, share){
+  var cx = 180, cy = 142, R = 92, i, pts = [], axes = '', rings = '', labels = '';
+  function pt(k, r){ var a = -Math.PI/2 + k * 2*Math.PI/5; return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
+  for (var lv=1; lv<=4; lv++){
+    var ring = []; for (i=0; i<5; i++){ var p = pt(i, R*lv/4); ring.push(p[0].toFixed(1)+','+p[1].toFixed(1)); }
+    rings += '<polygon points="'+ring.join(' ')+'" fill="none" stroke="var(--line)" stroke-width="1"/>';
+  }
+  for (i=0; i<5; i++){
+    var e = pt(i, R); axes += '<line x1="'+cx+'" y1="'+cy+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="var(--line)"/>';
+    var v = pt(i, R*dims[i]); pts.push(v[0].toFixed(1)+','+v[1].toFixed(1));
+    var l = pt(i, R + 26), anchor = Math.abs(l[0]-cx) < 4 ? 'middle' : (l[0] > cx ? 'start' : 'end');
+    labels += '<text x="'+l[0].toFixed(1)+'" y="'+(l[1]-2).toFixed(1)+'" text-anchor="'+anchor+'" font-size="14" font-weight="700" fill="var(--ink)">'+DIM_NAME[i]+'</text>'
+            + '<text x="'+l[0].toFixed(1)+'" y="'+(l[1]+14).toFixed(1)+'" text-anchor="'+anchor+'" font-size="11.5" fill="var(--sub)">'+GROUP_BY_REL[i]+' '+(share[i]*100).toFixed(0)+'%</text>';
+  }
+  var dots = pts.map(function(p){ var a = p.split(','); return '<circle cx="'+a[0]+'" cy="'+a[1]+'" r="3.5" fill="var(--accent)"/>'; }).join('');
+  return '<svg viewBox="0 0 360 272" style="width:100%;max-width:400px;display:block;margin:4px auto" role="img" aria-label="性格五維雷達圖">'
+    + rings + axes + '<polygon points="'+pts.join(' ')+'" fill="var(--accent)" fill-opacity=".22" stroke="var(--accent)" stroke-width="2"/>' + dots + labels + '</svg>';
+}
+function renderPersona(C){
+  var ps = calcPersona(C), dm = C.dm, h = '<h2>人格特性</h2>';
+  h += '<div class="persona-hero"><div class="ph-img big">' + wxSpan(GAN[dm], true) + '</div><div><div class="ph-t">' + GAN[dm] + WX[GAN_WX[dm]] + '日主・' + ps.dm.img + '</div><div class="ph-k">' + ps.dm.key + '</div></div></div>';
+  h += '<p class="note"><b>本性</b>　' + ps.dm.good + '。</p><p class="note"><b>課題</b>　' + ps.dm.weak + '。</p>';
+  h += '<p class="note"><b>能量</b>　日主' + C.st.level + '：' + ps.energy + '</p>';
+  h += '<h3>性格五維</h3>' + radarSVG(ps.dims, ps.share);
+  h += '<h3>主導十神</h3><ul class="list">';
+  ps.top.forEach(function(g){ var t = GOD_TRAIT[g.k]; h += '<li><b>' + g.k + '</b><span class="hint">　力量 ' + g.v.toFixed(1) + '</span><br>' + t[0] + '。<span class="hint">過旺時：' + t[1] + '。</span></li>'; });
+  ps.lacks.forEach(function(i){ h += '<li><b>' + GROUP_BY_REL[i] + '偏弱</b><br>' + GROUP_LACK[i] + '。</li>'; });
+  h += '</ul>';
+  if (ps.combo.length){
+    h += '<h3>十神組合</h3><ul class="list">';
+    ps.combo.forEach(function(c){ h += '<li><span class="tagx">' + c[0] + '</span>' + c[1] + '</li>'; });
+    h += '</ul>';
+  }
+  if (ps.wxEx.length || ps.wxLk.length){
+    h += '<h3>五行性情</h3><ul class="list">';
+    ps.wxEx.forEach(function(i){ h += '<li>' + chipWx(i) + ' 過旺（主' + WX_VIRTUE[i] + '）：' + WX_EXCESS[i] + '。</li>'; });
+    ps.wxLk.forEach(function(i){ h += '<li>' + chipWx(i) + ' 偏少（主' + WX_VIRTUE[i] + '）：' + WX_LACK[i] + '。</li>'; });
+    h += '</ul>';
+  }
+  if (ps.ss.length){
+    h += '<h3>神煞性格</h3><ul class="list">';
+    ps.ss.forEach(function(s){ h += '<li><b>' + s + '</b>　' + SS_TRAIT[s] + '。</li>'; });
+    h += '</ul>';
+  }
+  var o = ps.order;
+  h += '<h3>總結</h3><ul class="list">'
+     + '<li><b>人際相處</b>　' + GROUP_SOCIAL[o[0]] + '；' + GROUP_SOCIAL[o[1]] + '。</li>'
+     + '<li><b>適合角色</b>　' + GROUP_ROLE[o[0]] + '；次為' + GROUP_ROLE[o[1]] + '。</li>'
+     + '<li><b>成長方向</b>　' + (ps.lacks.length ? '補足' + ps.lacks.map(function(i){ return DIM_NAME[i]; }).join('、') + '面向；' : '') + '多運用喜用神' + C.st.yong.map(function(w){ return WX[w]; }).join('') + '的特質（' + WX_VIRTUE[C.st.yong[0]] + '）。</li></ul>';
+  h += '<div class="row"><button class="btn small" id="askPersona">請 AI 大師深入分析人格</button></div>';
+  $('p-persona').innerHTML = h;
+}
+function personaText(C){
+  var ps = calcPersona(C);
+  return '人格特性（系統分析）：日主' + GAN[C.dm] + '為' + ps.dm.img + '（' + ps.dm.key + '）；主導十神' + ps.top.map(function(g){ return g.k; }).join('、')
+    + '；五維比重 ' + DIM_NAME.map(function(d, i){ return d + (ps.share[i]*100).toFixed(0) + '%'; }).join(' ')
+    + (ps.lacks.length ? '；偏弱面向' + ps.lacks.map(function(i){ return GROUP_BY_REL[i]; }).join('、') : '')
+    + (ps.combo.length ? '；十神組合' + ps.combo.map(function(c){ return c[0]; }).join('、') : '')
+    + (ps.ss.length ? '；性格神煞' + ps.ss.join('、') : '');
+}
+
 /* ============ 命盤文字（給 AI / 複製） ============ */
 function chartText(C){
   var P = C.P, n = C.hasTime ? 4 : 3, i, L = [];
@@ -559,6 +702,7 @@ function chartText(C){
   L.push('格局：' + C.geju.name + '（' + C.geju.how + '）');
   L.push('扶抑喜用（系統參考）：用神' + C.st.yong.map(function(w){return WX[w];}).join('') + '，喜神' + C.st.xi.map(function(w){return WX[w];}).join('') + '，忌神' + C.st.ji.map(function(w){return WX[w];}).join('') + '。' + C.st.reason + (C.st.tiaohou ? ' ' + C.st.tiaohou : ''));
   if (C.rels.length) L.push('原局刑沖合會：' + C.rels.map(function(r){ return r.s; }).join('；'));
+  L.push(personaText(C));
   L.push('空亡：' + ZHI[C.kong[0]] + ZHI[C.kong[1]] + '（日柱旬空）；胎元' + C.taiyuan + '、命宮' + C.minggong + '、身宮' + C.shengong);
   L.push('起運：' + C.yunStart + '（' + C.yunDate + ' 交運）');
   L.push('大運：' + C.DY.slice(0,9).map(function(d){ return d.startAge + '歲' + d.gz + '(' + d.startYear + '-' + d.endYear + '，' + d.gGod + '/' + d.zGod + ')'; }).join('、'));
@@ -653,7 +797,7 @@ var CUR = null, selDY = -1, selYear = 0, chatMsgs = [];
 function render(C){
   CUR = C; chatMsgs = []; $('chat').innerHTML = '';
   $('result').className = '';
-  renderSummary(C); renderChart(C); renderWX(C);
+  renderSummary(C); renderChart(C); renderPersona(C); renderWX(C);
   var cy = currentBaziYear(); selYear = cy; selDY = currentDY(C, cy); if (selDY < 0) selDY = 0;
   renderDY(C); renderRel(C); renderQChips();
 }
@@ -801,7 +945,7 @@ function renderRel(C){
 }
 
 /* ============ AI 大師 ============ */
-var QUICK = ['整體命格與性格','事業與適合方向','財運','感情婚姻','健康注意','今年流年運勢','未來十年大運'];
+var QUICK = ['整體命格','人格特質與內在動機','事業與適合方向','財運','感情婚姻','健康注意','今年流年運勢','未來十年大運'];
 function renderQChips(){
   $('qchips').innerHTML = QUICK.map(function(q){ return '<button data-q="' + q + '">' + q + '</button>'; }).join('');
 }
@@ -909,6 +1053,7 @@ function bind(){
     if (el.getAttribute('data-i') !== null){ selDY = +el.getAttribute('data-i'); var d = CUR.DY[selDY]; if (selYear < d.startYear || selYear > d.endYear) selYear = d.startYear; renderDY(CUR); }
     else if (el.getAttribute('data-y') !== null){ selYear = +el.getAttribute('data-y'); renderDY(CUR); var yb = $('yearBox'); if (yb) yb.scrollIntoView({behavior:'smooth', block:'nearest'}); }
   });
+  $('p-persona').addEventListener('click', function(e){ if (e.target.id === 'askPersona'){ setTab('ai'); ask('請深入分析我的人格特質：天性、內在動機、優勢與盲點、人際與親密關係中的模式，以及如何揚長補短。'); } });
   $('qchips').addEventListener('click', function(e){ var q = e.target.getAttribute('data-q'); if (q) ask('請論我的' + q + '。'); });
   $('askBtn').addEventListener('click', function(){ var v = $('askIn').value.trim(); if (v){ $('askIn').value = ''; ask(v); } });
   $('askIn').addEventListener('keydown', function(e){ if (e.keyCode === 13){ e.preventDefault(); $('askBtn').click(); } });
