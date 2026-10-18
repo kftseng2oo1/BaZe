@@ -4,4 +4,5 @@
 
 - 單檔 `index.html`，曆法庫（lunar-javascript）已內嵌，可離線排盤
 - 支援真太陽時、夏令時間、早晚子時、農曆閏月
+- 人格特性分析，可匯出動畫旁白影片（arcar /tts 台灣腔語音，MP4）分享到 LINE
 - 線上版：https://kftseng2oo1.github.io/baze/
